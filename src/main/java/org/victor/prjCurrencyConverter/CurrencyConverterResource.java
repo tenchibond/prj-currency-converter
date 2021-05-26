@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.UUID;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
@@ -12,18 +13,21 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
+import org.apache.http.HttpStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.victor.prjCurrencyConverter.Model.ConvertedCurrencyLog;
 import org.victor.prjCurrencyConverter.Model.LiveCurrency;
-import org.apache.http.HttpStatus;
 
 import io.smallrye.mutiny.Uni;
 import io.vertx.core.json.JsonObject;
+import io.vertx.ext.web.client.WebClientOptions;
 import io.vertx.mutiny.core.Vertx;
+import io.vertx.mutiny.core.eventbus.EventBus;
 import io.vertx.mutiny.ext.web.client.WebClient;
 
 
-@Path("/currency-converter")
+@Path("/currencyConverter")
 public class CurrencyConverterResource {
 	
 	private static final Logger LOGGER = LoggerFactory.getLogger(CurrencyConverterResource.class);
@@ -31,6 +35,15 @@ public class CurrencyConverterResource {
 	@Inject Vertx vertx;
 	
 	private WebClient webClient;
+	
+	@Inject EventBus eventBus;
+	
+	@PostConstruct
+	void initialize() {
+		this.webClient = WebClient.create(vertx, new WebClientOptions()
+				.setDefaultHost("api.currencylayer.com").setTrustAll(true));
+		LOGGER.info("Webclient criado!");		
+	}
 
 	@GET
 	@Produces(MediaType.APPLICATION_JSON)
@@ -132,6 +145,13 @@ public class CurrencyConverterResource {
 	}
 	
 	private void sendConvertedCurrencyToLog(JsonObject jsonObject) {
-		
+		ConvertedCurrencyLog converted = new ConvertedCurrencyLog();
+		converted.setFromCurrency( jsonObject.getString("FromCurrency") );
+		converted.setFromValue( jsonObject.getString("Value") );
+		converted.setIdUser( jsonObject.getString("IdUser") );
+		converted.setQuote( jsonObject.getString("Quote") );
+		converted.setTime( jsonObject.getString("Time") );
+		converted.setToCurrency( jsonObject.getString("ToCurrency") );
+		eventBus.sendAndForget("object", converted);
 	}
 }
